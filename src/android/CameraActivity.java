@@ -54,6 +54,10 @@ import java.util.List;
 import java.util.Arrays;
 import java.util.UUID;
 
+import android.widget.Toast; 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+
 public class CameraActivity extends Fragment {
 
   public interface CameraPreviewListener {
@@ -283,9 +287,12 @@ public class CameraActivity extends Fragment {
   @Override
   public void onResume() {
     super.onResume();
+    
+    //cameraError();
+     
+    try {
 
     mCamera = Camera.open(defaultCameraId);
-
     if (cameraParameters != null) {
       mCamera.setParameters(cameraParameters);
     }
@@ -323,11 +330,29 @@ public class CameraActivity extends Fragment {
         }
       });
     }
+   } catch (Exception e) {
+	   cameraError();
+   }
+   
+  }
+
+ 
+  public void cameraError(){
+      AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+      builder.setMessage("Camera for another app is opened.Please close app and login again");
+      builder.setTitle("Alert !"); 
+      builder.setCancelable(false); 
+      builder.setNegativeButton("ok", (DialogInterface.OnClickListener) (dialog, which) -> { 
+      dialog.cancel();
+      getActivity().finish();
+      System.exit(0);
+      });
+     AlertDialog alertDialog = builder.create(); 
+     alertDialog.show();  	      
   }
 
   @Override
   public void onPause() {
-    super.onPause();
 
     // Because the Camera object is a shared resource, it's very important to release it when the activity is paused.
     if (mCamera != null) {
@@ -337,9 +362,16 @@ public class CameraActivity extends Fragment {
       mCamera.release();
       mCamera = null;
     }
+    try {
+          Thread.sleep(500);
+    } catch (InterruptedException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+    }
 
     Activity activity = getActivity();
     muteStream(false, activity);
+    super.onPause();
   }
 
   public Camera getCamera() {
@@ -697,22 +729,7 @@ public class CameraActivity extends Fragment {
 
       Camera.Parameters cameraParams = mCamera.getParameters();
       if (withFlash) {
-        List<String> flashModes = cameraParams.getSupportedFlashModes();
-
-        if (flashModes != null) {
-          Log.d(TAG, "Enabling flash on device");
-
-          if (flashModes.contains(Camera.Parameters.FLASH_MODE_TORCH)) {
-            cameraParams.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
-          } else if (flashModes.contains(Camera.Parameters.FLASH_MODE_ON)) {
-            cameraParams.setFlashMode(Camera.Parameters.FLASH_MODE_ON);
-          } else if (flashModes.contains(Camera.Parameters.FLASH_MODE_AUTO)) {
-            cameraParams.setFlashMode(Camera.Parameters.FLASH_MODE_AUTO);
-          }
-        } else {
-          Log.d(TAG, "Flash not supported on device");
-        }
-
+        cameraParams.setFlashMode(withFlash ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
         mCamera.setParameters(cameraParams);
         mCamera.startPreview();
       }
@@ -753,21 +770,8 @@ public class CameraActivity extends Fragment {
         Log.d(TAG, "Starting recording");
         mRecorder.start();
         eventListener.onStartRecordVideo();
-      } catch (IOException ioException) {
-        Log.e(TAG, "Recording failed, file issue", ioException);
-        eventListener.onStartRecordVideoError(ioException.getMessage());
-
-        mRecorder = null;
-      } catch (IllegalStateException stateException) {
-        Log.e(TAG, "Recording failed, audio/video may be in use by another application", stateException);
-        eventListener.onStartRecordVideoError("Failed to start recording, your audio or video may be in use by another application");
-
-        mRecorder = null;
-      } catch (Exception exception) {
-        Log.e(TAG, "Recording failed, unknown", exception);
-        eventListener.onStartRecordVideoError(exception.getMessage());
-
-        mRecorder = null;
+      } catch (IOException e) {
+        eventListener.onStartRecordVideoError(e.getMessage());
       }
     } else {
       Log.d(TAG, "Requiring RECORD_AUDIO permission to continue");
